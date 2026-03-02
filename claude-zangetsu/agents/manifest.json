@@ -1,0 +1,52 @@
+{
+  "name": "claude-zangetsu-mcp",
+  "version": "1.0.0",
+  "description": "Dual-agent MCP server fusing Claude (Reasoner) and Zangetsu (Guardian)",
+  "port": 3042,
+  "identity": {
+    "papers": [
+      {
+        "id": "HER",
+        "title": "HER: Human-like Reasoning and Reinforcement Learning for LLM Role-playing",
+        "arxiv": "2601.21459",
+        "authors": "Chengyu Du et al.",
+        "agent": "claude",
+        "contribution": "Think-Act-Observe-Adapt reasoning cycle, cognitive coherence"
+      },
+      {
+        "id": "TI",
+        "title": "From Mimicry to True Intelligence",
+        "authors": "Meltem Subasioglu; Nevzat Subasioglu",
+        "agent": "zangetsu",
+        "contribution": "Beyond pattern matching, autonomous ethical decisions"
+      }
+    ],
+    "fusion_principle": "Reasoner + Guardian = Sovereign Intelligence",
+    "tagline": "We don't mimic. We understand. We protect."
+  },
+  "agents": [
+    {
+      "codename": "CLAUDE",
+      "role": "Reasoner",
+      "slots": [0, 2, 4, 6],
+      "capabilities": ["analytical_reasoning", "code_synthesis", "architectural_design", "rl_adaptation"]
+    },
+    {
+      "codename": "ZANGETSU",
+      "role": "Guardian",
+      "slots": [1, 3, 5, 7],
+      "capabilities": ["perimeter_defense", "threat_analysis", "ethical_enforcement", "autonomous_protection"],
+      "protocol": "Z-01"
+    }
+  ],
+  "endpoints": {
+    "status": "GET /api/status",
+    "agents": "GET /api/agents",
+    "slots":  "GET /api/slots",
+    "dna":    "GET /api/dna",
+    "reason": "POST /api/reason",
+    "guard":  "POST /api/guard",
+    "health": "GET /api/health"
+  },
+  "startup": "python3 backend/server.py"
+}

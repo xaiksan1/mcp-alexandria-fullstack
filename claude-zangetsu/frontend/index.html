@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Porta-Mundi Cortex | Claude×Zangetsu v2.0</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { mono: ['JetBrains Mono', 'monospace'] }
+        }
+      }
+    }
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'JetBrains Mono', monospace; background: #000; }
+    @keyframes spin-slow { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    @keyframes reverse-spin-slow { from { transform: rotate(360deg); } to { transform: rotate(0deg); } }
+    .animate-spin-slow { animation: spin-slow 10s linear infinite; }
+    .animate-reverse-spin-slow { animation: reverse-spin-slow 8s linear infinite; }
+    .scrollbar-hide::-webkit-scrollbar { display: none; }
+    ::selection { background: #06b6d4; color: #000; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    const API_BASE = 'http://localhost:3042';
+
+    // ─── Lucide Icon Components (lightweight wrappers) ───
+    const LucideIcon = ({ name, size = 16, className = "" }) => {
+      const ref = useRef(null);
+      useEffect(() => {
+        if (ref.current && lucide[name]) {
+          ref.current.innerHTML = '';
+          const svg = lucide.createElement(lucide[name]);
+          svg.setAttribute('width', size);
+          svg.setAttribute('height', size);
+          svg.setAttribute('class', className);
+          ref.current.appendChild(svg);
+        }
+      }, [name, size, className]);
+      return <span ref={ref} className={`inline-flex items-center ${className}`} />;
+    };
+
+    const App = () => {
+      const [energonLevel, setEnergonLevel] = useState(7043.72);
+      const [busDelay, setBusDelay] = useState(0);
+      const [tuiCommand, setTuiCommand] = useState("");
+      const [serverData, setServerData] = useState(null);
+      const [thermalData, setThermalData] = useState(null);
+      const [logs, setLogs] = useState([
+        "Cortex Command Center : INITIALISÉ",
+        "Structure Quaternionique : ALIGNÉE",
+        "Protocole AKER : EN VEILLE",
+        "Porte Stargate : VERROUILLÉE",
+        `Connexion API : ${API_BASE}`
+      ]);
+
+      const [gateStatus, setGateStatus] = useState('IDLE');
+      const [matchScore, setMatchScore] = useState(0);
+
+      // ─── Live API Polling ───
+      useEffect(() => {
+        const fetchStatus = async () => {
+          try {
+            const [statusR, thermalR] = await Promise.all([
+              fetch(`${API_BASE}/api/status`).then(r => r.json()),
+              fetch(`${API_BASE}/api/thermal/status`).then(r => r.json()),
+            ]);
+            setServerData(statusR);
+            setThermalData(thermalR);
+            setBusDelay(Math.round(statusR.uptime_s * 0.1));
+            setEnergonLevel(7000 + statusR.uptime_s * 0.5);
+          } catch(e) {
+            // Offline — simulate
+            setBusDelay(Math.floor(Math.random() * 15));
+            setEnergonLevel(prev => prev + (Math.random() * 0.05));
+          }
+        };
+        fetchStatus();
+        const interval = setInterval(fetchStatus, 3000);
+        return () => clearInterval(interval);
+      }, []);
+
+      // ─── TUI Command Handler → Cortex Injector ───
+      const handleTuiSubmit = async (e) => {
+        e.preventDefault();
+        if (!tuiCommand) return;
+        setLogs(prev => [`> EXEC: ${tuiCommand}`, ...prev.slice(0, 15)]);
+
+        if (tuiCommand.toUpperCase() === 'INIT SCAN') {
+          startGateScan();
+        } else {
+          // Send to Cortex Injector API
+          try {
+            const res = await fetch(`${API_BASE}/api/cortex/inject`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ cmd: tuiCommand })
+            });
+            const data = await res.json();
+            if (data.stdout) {
+              setLogs(prev => [`← ${data.stdout.trim()}`, `[${data.elapsed_ms}ms | direct_subprocess]`, ...prev.slice(0, 15)]);
+            }
+            if (data.error) {
+              setLogs(prev => [`[ERREUR] ${data.error}`, ...prev.slice(0, 15)]);
+            }
+          } catch(e) {
+            setLogs(prev => [`[OFFLINE] Cortex non connecté`, ...prev.slice(0, 15)]);
+          }
+        }
+        setTuiCommand("");
+      };
+
+      const startGateScan = () => {
+        if (gateStatus === 'SCANNING') return;
+        setGateStatus('SCANNING');
+        setMatchScore(0);
+        setLogs(prev => [
+          "Reconstruction KAN (Face-or-Erase)...",
+          "Analyse de l'Embedding SlerpFace...",
+          "Déclenchement du scan Stargate...",
+          ...prev.slice(0, 15)
+        ]);
+
+        let progress = 0;
+        const scanInterval = setInterval(() => {
+          progress += Math.random() * 15;
+          if (progress >= 100) {
+            clearInterval(scanInterval);
+            const passed = Math.random() > 0.5;
+            if (passed) {
+              setMatchScore(98.4);
+              setGateStatus('GRANTED');
+              setLogs(prev => ["ACCÈS AUTORISÉ : Bienvenue dans Alexandria.", "Signature d'Embedding : VALIDE", ...prev.slice(0, 15)]);
+            } else {
+              setMatchScore(12.3);
+              setGateStatus('REJECTED');
+              setLogs(prev => ["CONNEXION TERMINÉE : Éjection de l'intrus.", "ERREUR : Échec de la reconstruction FEM-MLP.", ...prev.slice(0, 15)]);
+              setTimeout(() => setGateStatus('IDLE'), 4000);
+            }
+          } else {
+            setMatchScore(progress);
+          }
+        }, 300);
+      };
+
+      const thermalState = thermalData?.pressure?.state || 'WARM';
+      const thermalPressure = thermalData?.pressure?.pressure || 0.83;
+      const totalSlots = thermalData?.total_slots || 12;
+
+      return (
+        <div className="min-h-screen bg-black text-cyan-400 font-mono p-4 flex flex-col gap-4 overflow-hidden">
+          {/* HEADER */}
+          <header className="flex justify-between items-center border border-cyan-900/50 p-4 bg-slate-950/50 backdrop-blur-xl rounded-t-2xl">
+            <div className="flex items-center gap-4">
+              <div className="relative">
+                <div className="absolute inset-0 bg-cyan-500 blur-md opacity-20 animate-pulse"></div>
+                <LucideIcon name="Box" size={28} className="relative text-cyan-400" />
+              </div>
+              <div>
+                <h1 className="text-xl font-black tracking-[0.2em] uppercase italic">Porta-Mundi Cortex</h1>
+                <div className="flex gap-4 text-[10px] text-cyan-700">
+                  <span className="flex items-center gap-1"><LucideIcon name="Shield" size={10}/> ADM-SECURED</span>
+                  <span className="flex items-center gap-1"><LucideIcon name="Zap" size={10}/> QUATERNION_MODE</span>
+                  <span className="flex items-center gap-1"><LucideIcon name="Thermometer" size={10}/> {thermalState}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-8">
+              <StatBlock label="Energon Ledger" value={`${energonLevel.toFixed(2)} EGN`} color="text-yellow-500" />
+              <StatBlock label="Slots Active" value={`${totalSlots}`} color="text-cyan-400" />
+              <StatBlock label="Thermal" value={`${(thermalPressure * 100).toFixed(0)}%`} color={thermalState === 'HOT' ? 'text-red-500' : thermalState === 'WARM' ? 'text-orange-400' : 'text-green-500'} />
+              <StatBlock label="Aker Guardian" value="ACTIF" color="text-purple-500 animate-pulse" />
+            </div>
+          </header>
+
+          {/* MAIN CONTENT */}
+          <main className="flex-1 grid grid-cols-12 gap-4 overflow-hidden" style={{minHeight: '70vh'}}>
+
+            {/* LEFT: Management & Terminal */}
+            <div className="col-span-3 flex flex-col gap-4">
+              <Panel title="Cortex_Management">
+                <div className="grid grid-cols-2 gap-2">
+                  <ModuleButton icon="Settings" label="Core Tuning" active />
+                  <ModuleButton icon="Cpu" label="Ratchet Sync" />
+                  <ModuleButton icon="Share2" label="Nexus Link" />
+                  <ModuleButton icon="Database" label="He3 Layer" active />
+                </div>
+              </Panel>
+
+              <Panel title="Slot_Machine_Terminal" className="flex-1">
+                <div className="flex flex-col h-full gap-2" style={{minHeight: '300px'}}>
+                  <div className="flex-1 bg-black/60 rounded border border-cyan-900/30 p-2 overflow-y-auto text-[10px] scrollbar-hide space-y-1 font-light">
+                    {logs.map((log, i) => (
+                      <div key={i} className={log.startsWith('>') ? 'text-cyan-300 font-bold' : log.startsWith('←') ? 'text-green-400' : log.includes('ERREUR') || log.includes('REJECTED') ? 'text-red-500 font-bold' : log.includes('AUTORISÉ') ? 'text-green-400 font-bold' : 'text-cyan-800 italic'}>
+                        {log}
+                      </div>
+                    ))}
+                  </div>
+                  <form onSubmit={handleTuiSubmit} className="flex gap-2">
+                    <div className="text-cyan-700 font-bold">$</div>
+                    <input
+                      type="text"
+                      value={tuiCommand}
+                      onChange={(e) => setTuiCommand(e.target.value)}
+                      className="bg-transparent border-none outline-none flex-1 text-xs text-cyan-400 placeholder:text-cyan-900"
+                      placeholder="Commande cortex ou 'INIT SCAN'..."
+                    />
+                  </form>
+                </div>
+              </Panel>
+            </div>
+
+            {/* CENTER: Quaternion Core */}
+            <div className="col-span-5 relative flex items-center justify-center bg-slate-950/30 rounded-3xl border border-cyan-500/5 overflow-hidden shadow-[inset_0_0_100px_rgba(0,0,0,1)]">
+              <CortexQuaternionSphere />
+              <div className="absolute bottom-6 flex flex-col items-center pointer-events-none">
+                <div className="text-2xl font-black text-white/90 tracking-[0.3em] uppercase mb-1 drop-shadow-2xl">Cortex Sphere</div>
+                <div className="text-[10px] text-cyan-600 bg-cyan-950/30 px-4 py-1 rounded-full border border-cyan-500/20">
+                  NOYAU DIMENSIONNEL ACTIF — v2.0
+                </div>
+              </div>
+            </div>
+
+            {/* RIGHT: Stargate Authentication */}
+            <div className="col-span-4 flex flex-col gap-4 overflow-hidden">
+              <Panel title="Stargate_Auth_Gate" className="flex-1 overflow-hidden relative">
+
+                {gateStatus === 'REJECTED' && (
+                  <div className="absolute inset-0 z-20 bg-red-950/90 flex flex-col items-center justify-center backdrop-blur-sm border-2 border-red-500 rounded-lg animate-pulse">
+                    <LucideIcon name="AlertTriangle" size={48} className="text-red-500 mb-4" />
+                    <h2 className="text-2xl font-black text-red-500 tracking-widest uppercase">Éradication</h2>
+                    <p className="text-xs text-red-300 mt-2 text-center px-4">Signature invalide.<br/>Connexion rejetée et détruite.</p>
+                  </div>
+                )}
+
+                <div className="flex flex-col items-center justify-center h-full gap-6">
+
+                  {/* Stargate */}
+                  <div className="relative w-48 h-48 flex items-center justify-center">
+                    <div className={`absolute inset-0 rounded-full border-4 border-dashed transition-all duration-1000 ${gateStatus === 'SCANNING' ? 'border-cyan-400 animate-spin' : gateStatus === 'GRANTED' ? 'border-green-500' : 'border-slate-800'}`}></div>
+                    <div className={`absolute inset-2 rounded-full border-2 border-dotted transition-all duration-700 ${gateStatus === 'SCANNING' ? 'border-purple-500 animate-reverse-spin-slow' : gateStatus === 'GRANTED' ? 'border-green-400' : 'border-slate-700'}`}></div>
+
+                    <div className={`absolute inset-6 rounded-full flex items-center justify-center transition-colors duration-500 ${gateStatus === 'SCANNING' ? 'bg-cyan-950/50 shadow-[0_0_30px_rgba(6,182,212,0.5)]' : gateStatus === 'GRANTED' ? 'bg-green-950/50 shadow-[0_0_30px_rgba(34,197,94,0.5)]' : 'bg-slate-900/50'}`}>
+                      {gateStatus === 'IDLE' && <LucideIcon name="Lock" size={32} className="text-slate-600" />}
+                      {gateStatus === 'SCANNING' && <LucideIcon name="Scan" size={40} className="text-cyan-400 animate-pulse" />}
+                      {gateStatus === 'GRANTED' && <LucideIcon name="Fingerprint" size={40} className="text-green-400" />}
+                    </div>
+                  </div>
+
+                  {/* Embedding Analysis Console */}
+                  <div className="w-full bg-black/50 border border-slate-800 rounded-lg p-3">
+                    <div className="text-[10px] font-bold text-cyan-600 uppercase mb-2 flex justify-between">
+                      <span>Analyse KAN / MLP</span>
+                      <span>{Math.min(matchScore, 100).toFixed(1)}%</span>
+                    </div>
+
+                    <div className="h-2 w-full bg-slate-900 rounded-full overflow-hidden mb-3">
+                      <div
+                        className={`h-full transition-all duration-300 ${gateStatus === 'REJECTED' ? 'bg-red-500' : gateStatus === 'GRANTED' ? 'bg-green-500' : 'bg-cyan-500'}`}
+                        style={{ width: `${Math.min(matchScore, 100)}%` }}
+                      ></div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-[8px] text-slate-400">
+                      <div className="bg-slate-900/50 p-1 rounded border border-slate-800 text-center">
+                        <span className="block text-cyan-700 font-bold">Cible</span>
+                        Embedding Requis
+                      </div>
+                      <div className="bg-slate-900/50 p-1 rounded border border-slate-800 text-center">
+                        <span className="block text-purple-700 font-bold">Reconstruction</span>
+                        Signature entrante
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={startGateScan}
+                    disabled={gateStatus !== 'IDLE'}
+                    className="px-6 py-2 bg-slate-900 border border-cyan-800 text-cyan-500 text-xs font-bold uppercase tracking-widest rounded hover:bg-cyan-950 hover:text-cyan-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {gateStatus === 'IDLE' ? 'Initier Protocole Aker' : gateStatus === 'SCANNING' ? 'Analyse en cours...' : 'Porte Active'}
+                  </button>
+
+                </div>
+              </Panel>
+            </div>
+
+          </main>
+
+          {/* FOOTER */}
+          <footer className="h-16 flex items-center justify-between px-6 bg-slate-950 border border-cyan-900/50 rounded-b-2xl">
+            <div className="flex gap-4">
+              {[
+                { icon: "Shield", label: "SENTINEL" },
+                { icon: "Radio", label: "PHOENIX" },
+                { icon: "Settings", label: "CORTEX" },
+                { icon: "Activity", label: "MAYURI" },
+                { icon: "Maximize2", label: "PORTAMUNDI" }
+              ].map((m, i) => (
+                <button key={i} className="flex flex-col items-center gap-1 group">
+                  <div className="p-2 border border-slate-800 rounded group-hover:border-cyan-500 transition-colors bg-black/40">
+                    <LucideIcon name={m.icon} size={16} />
+                  </div>
+                  <span className="text-[8px] text-slate-500 group-hover:text-cyan-400">{m.label}</span>
+                </button>
+              ))}
+            </div>
+
+            <div className="flex items-center gap-3 bg-cyan-950/20 px-4 py-2 rounded-lg border border-cyan-900/40">
+              <div className="w-2 h-2 bg-purple-500 rounded-full animate-ping"></div>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-purple-400">Salle aux Trésors Verrouillée</span>
+            </div>
+          </footer>
+        </div>
+      );
+    };
+
+    // ─── Panel Component ───
+    const Panel = ({ title, children, className = "" }) => (
+      <div className={`bg-slate-950/40 border border-cyan-900/30 rounded-lg p-4 flex flex-col ${className}`}>
+        <h2 className="text-[10px] font-black uppercase tracking-[0.2em] mb-4 text-cyan-500 flex items-center gap-2">
+          <LucideIcon name="Command" size={12}/> {title}
+        </h2>
+        <div className="flex-1">{children}</div>
+      </div>
+    );
+
+    const StatBlock = ({ label, value, color }) => (
+      <div className="flex flex-col items-end">
+        <span className="text-[8px] text-slate-500 uppercase tracking-widest">{label}</span>
+        <span className={`text-sm font-black ${color}`}>{value}</span>
+      </div>
+    );
+
+    const ModuleButton = ({ icon, label, active = false }) => (
+      <button className={`flex items-center gap-2 p-2 border rounded transition-all text-[10px] uppercase font-bold
+        ${active ? 'bg-cyan-500/10 border-cyan-500 text-cyan-300' : 'bg-black/40 border-slate-800 text-slate-500 hover:border-cyan-900'}
+      `}>
+        <LucideIcon name={icon} size={14} /> <span>{label}</span>
+      </button>
+    );
+
+    // ─── Three.js Quaternion Sphere ───
+    const CortexQuaternionSphere = () => {
+      const mountRef = useRef(null);
+      const mouseRef = useRef({ x: 0, y: 0, targetX: 0, targetY: 0, wPulse: 1 });
+
+      useEffect(() => {
+        if (!window.THREE || !mountRef.current) return;
+
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+
+        const container = mountRef.current;
+        const width = Math.min(container.clientWidth, 500);
+        const height = Math.min(container.clientHeight, 500);
+        renderer.setSize(width, height);
+        container.appendChild(renderer.domElement);
+
+        // Core Sphere
+        const geometry = new THREE.SphereGeometry(2.2, 32, 32);
+        const material = new THREE.MeshPhongMaterial({
+          color: 0x00ffff, wireframe: true, transparent: true, opacity: 0.15,
+          emissive: 0x00ffff, emissiveIntensity: 0.3
+        });
+        const sphere = new THREE.Mesh(geometry, material);
+        scene.add(sphere);
+
+        // Quaternion rings
+        const ringGeom = new THREE.TorusGeometry(2.5, 0.02, 16, 100);
+        const rings = [];
+        for(let i = 0; i < 3; i++) {
+          const ring = new THREE.Mesh(ringGeom, new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.4 }));
+          ring.rotation.x = i * Math.PI / 3;
+          ring.rotation.y = i * Math.PI / 4;
+          scene.add(ring);
+          rings.push(ring);
+        }
+
+        // Synaptic particles
+        const particlesGeom = new THREE.BufferGeometry();
+        const count = 800;
+        const positions = new Float32Array(count * 3);
+        const colors = new Float32Array(count * 3);
+        const c = new THREE.Color(0x00ffff);
+        for(let i = 0; i < count * 3; i += 3) {
+          positions[i] = (Math.random() - 0.5) * 8;
+          positions[i+1] = (Math.random() - 0.5) * 8;
+          positions[i+2] = (Math.random() - 0.5) * 8;
+          colors[i] = c.r; colors[i+1] = c.g; colors[i+2] = c.b;
+        }
+        particlesGeom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        particlesGeom.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+        const points = new THREE.Points(particlesGeom, new THREE.PointsMaterial({
+          size: 0.04, vertexColors: true, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending
+        }));
+        scene.add(points);
+
+        scene.add(new THREE.PointLight(0xffffff, 1, 100));
+        scene.add(new THREE.AmbientLight(0x222222));
+        camera.position.z = 6;
+
+        const handleMouseMove = (e) => {
+          const rect = container.getBoundingClientRect();
+          mouseRef.current.targetX = ((e.clientX - rect.left) / width) * 2 - 1;
+          mouseRef.current.targetY = -((e.clientY - rect.top) / height) * 2 + 1;
+        };
+        const handleClick = () => {
+          mouseRef.current.wPulse = 2.5;
+          material.emissive.setHex(0xff00ff);
+          rings.forEach(r => r.material.color.setHex(0xff00ff));
+        };
+
+        container.addEventListener('mousemove', handleMouseMove);
+        container.addEventListener('click', handleClick);
+
+        let animId;
+        const animate = () => {
+          animId = requestAnimationFrame(animate);
+          const m = mouseRef.current;
+          m.x += (m.targetX - m.x) * 0.05;
+          m.y += (m.targetY - m.y) * 0.05;
+          m.wPulse += (1 - m.wPulse) * 0.02;
+
+          if(m.wPulse < 1.05) {
+            material.emissive.setHex(0x0088ff);
+            rings.forEach(r => r.material.color.setHex(0x00ffff));
+          }
+
+          sphere.rotation.y += 0.002 + (m.x * 0.05);
+          sphere.rotation.x += (m.y * 0.05);
+          sphere.scale.setScalar(m.wPulse);
+
+          rings.forEach((r, idx) => {
+            r.rotation.z += 0.01 * (idx + 1) * m.wPulse;
+            r.rotation.y += 0.005 + (m.x * 0.02);
+            r.rotation.x += (m.y * 0.02);
+            r.scale.setScalar(m.wPulse);
+          });
+
+          points.rotation.y += 0.001 * m.wPulse;
+          points.rotation.x = m.y * 0.5;
+          points.rotation.z = m.x * 0.5;
+          renderer.render(scene, camera);
+        };
+        animate();
+
+        return () => {
+          cancelAnimationFrame(animId);
+          container.removeEventListener('mousemove', handleMouseMove);
+          container.removeEventListener('click', handleClick);
+          if (container.contains(renderer.domElement)) container.removeChild(renderer.domElement);
+        };
+      }, []);
+
+      return <div ref={mountRef} className="z-10 cursor-crosshair transition-transform duration-500 hover:scale-105" />;
+    };
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
