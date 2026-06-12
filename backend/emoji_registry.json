@@ -240,5 +240,16 @@
     "active": true,
     "created_at": 1781268742.2794454,
     "meta": {}
+  },
+  "📖": {
+    "emoji": "📖",
+    "node_id": "manual-node",
+    "label": "Manuel Vivant",
+    "action_type": "node2window",
+    "target": "manual",
+    "description": "Le manuel Alexandria",
+    "active": true,
+    "created_at": 1781271984.2851784,
+    "meta": {}
   }
 }

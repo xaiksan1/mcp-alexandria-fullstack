@@ -33,6 +33,13 @@ sys.path.insert(0, str(BACKEND))
 
 from emoji_registry import get_registry, EmojiMapping
 
+# Hook yin-yang : régénère le manuel à chaque changement du registre
+try:
+    from manual_generator import hook_registry as _hook_registry
+    _hook_registry(auto_slack=False)
+except ImportError:
+    pass
+
 try:
     from cortex_injector import CortexInjector
     CORTEX = CortexInjector()
