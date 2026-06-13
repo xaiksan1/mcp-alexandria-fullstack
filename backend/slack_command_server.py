@@ -38,7 +38,9 @@ from pathlib import Path
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import FastAPI, Form, Header, HTTPException, Request
+from urllib.parse import parse_qs
+
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 import uvicorn
 
@@ -77,34 +79,29 @@ SIGNING_SECRET = CFG.get("SLACK_SIGNING_SECRET", os.environ.get("SLACK_SIGNING_S
 
 # ── Signature verification ────────────────────────────────────────────────────
 
-async def _verify_slack(request: Request) -> bytes:
+def _verify_slack(raw_body: bytes, headers) -> None:
     """
-    Vérifie la signature HMAC-SHA256 de Slack.
-    Lève HTTP 401 si la signature est invalide.
-    Si SLACK_SIGNING_SECRET n'est pas configuré → avertissement uniquement (dev mode).
+    Vérifie la signature HMAC-SHA256 de Slack sur le body brut.
+    Si SLACK_SIGNING_SECRET absent → mode dev (avertissement uniquement).
     """
-    body = await request.body()
-
     if not SIGNING_SECRET:
         print("[slack-cmd] ⚠️  SIGNING_SECRET absent — vérification désactivée (mode dev)")
-        return body
+        return
 
-    ts        = request.headers.get("X-Slack-Request-Timestamp", "")
-    signature = request.headers.get("X-Slack-Signature", "")
+    ts        = headers.get("x-slack-request-timestamp", "")
+    signature = headers.get("x-slack-signature", "")
 
-    # Rejeter les requêtes de plus de 5 minutes (replay attack)
     if abs(time.time() - int(ts or 0)) > 300:
         raise HTTPException(status_code=401, detail="Timestamp trop ancien")
 
-    base_string  = f"v0:{ts}:{body.decode()}"
-    expected_sig = "v0=" + hmac.new(
-        SIGNING_SECRET.encode(), base_string.encode(), hashlib.sha256
+    expected = "v0=" + hmac.new(
+        SIGNING_SECRET.encode(),
+        f"v0:{ts}:{raw_body.decode()}".encode(),
+        hashlib.sha256,
     ).hexdigest()
 
-    if not hmac.compare_digest(expected_sig, signature):
+    if not hmac.compare_digest(expected, signature):
         raise HTTPException(status_code=401, detail="Signature invalide")
-
-    return body
 
 
 # ── Parser commande ───────────────────────────────────────────────────────────
@@ -315,17 +312,18 @@ async def health():
 
 
 @app.post("/slack/command")
-async def slack_command(
-    request:      Request,
-    command:      str = Form(...),
-    text:         str = Form(default=""),
-    user_name:    str = Form(default="unknown"),
-    user_id:      str = Form(default=""),
-    channel_name: str = Form(default=""),
-    response_url: str = Form(default=""),
-):
-    # Vérification signature (non-bloquante si secret absent)
-    await _verify_slack(request)
+async def slack_command(request: Request):
+    # Lire le body brut UNE SEULE FOIS — évite le conflit Form + body stream
+    raw_body = await request.body()
+
+    # Vérification signature HMAC (non-bloquante si secret absent)
+    _verify_slack(raw_body, request.headers)
+
+    # Parser application/x-www-form-urlencoded manuellement
+    params       = {k: v[0] for k, v in parse_qs(raw_body.decode()).items()}
+    command      = params.get("command", "")
+    text         = params.get("text", "")
+    user_name    = params.get("user_name", "unknown")
 
     if command != "/update-manual":
         return JSONResponse({"text": f"Commande inconnue : {command}"})
