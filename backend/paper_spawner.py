@@ -4,9 +4,12 @@ import sys
 import re
 from typing import Dict, Any
 
+from toob_gate import verify as toob_verify, ToobRefus
+
 class PaperSpawner:
     def __init__(self):
-        self.output_dir = "/home/ichigo/alexandria/ADAM/mcp-alexandria-fullstack/backend/spawned_agents"
+        # Nurserie VIVANTE (celle que pm2 sert) — l'ancienne sous ADAM/ était la dérive de chemin
+        self.output_dir = "/home/ichigo/alexandria/mcp-alexandria-fullstack/backend/spawned_agents"
         os.makedirs(self.output_dir, exist_ok=True)
         print("--- Paper Spawner 1.0 (Straight-Pipe) Initialized ---")
 
@@ -69,7 +72,8 @@ if __name__ == "__main__":
             "type": "PAPER_BORN",
             "status": "SLOT_READY",
             "capabilities": data['capabilities'],
-            "source": data['source']
+            "source": data['source'],
+            "toob_diploma": data.get('toob_session')
         }
         
         # Update registry if it exists
@@ -84,13 +88,22 @@ if __name__ == "__main__":
         return new_agent
 
 if __name__ == "__main__":
-    if len(sys.argv) < 3:
-        print("Usage: python3 paper_spawner.py <markdown_file> <mode: mcp|slot>")
+    if len(sys.argv) < 4:
+        print("Usage: python3 paper_spawner.py <markdown_file> <mode: mcp|slot> <toob-session-id>")
+        print("Aucune naissance sans diplôme TOOB (session Flash and Jump 11/11 complete).")
         sys.exit(1)
-    
+
+    try:
+        diploma = toob_verify(sys.argv[3])
+    except ToobRefus as refus:
+        print(f"⛔ NAISSANCE REFUSÉE — {refus}")
+        sys.exit(2)
+
     spawner = PaperSpawner()
     info = spawner.parse_markdown(sys.argv[1])
-    
+    info['toob_session'] = sys.argv[3]
+    print(f"🎓 TOOB 11/11 vérifié ({sys.argv[3]}) — naissance autorisée")
+
     if sys.argv[2] == "mcp":
         spawner.spawn_mcp_server(info)
     elif sys.argv[2] == "slot":
