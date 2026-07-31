@@ -1,3 +1,7 @@
+#!/usr/bin/env python3
+# Run via ADAM/.venv/bin/python3 (has eth-account for the real wallet
+# derivation below) — plain system python3 does not have it and PEP 668
+# blocks a global pip install on this host.
 import hashlib
 import os
 import json
@@ -9,10 +13,11 @@ from typing import Dict, Any
 # it can pay for things via x402 (ADAM/dwallstreet/x402_handler.py). Larva-born
 # (PAPER_BORN) agents are new in Alexandria v5.0, and this was simply never
 # wired in yet for this birth path — confirmed by grep (2026-07-31), not a
-# regression. derive_agent_wallet() is a deterministic Base58Check pseudo-
-# address (see agentic-ads/payments/tim_burner.py's own docstring): fine for
-# internal agent-to-agent Energon bookkeeping (ADAM/orbit-node/orbit_hub.py),
-# NEVER to be used as a real on-chain recipient address.
+# regression. derive_agent_wallet() is a REAL secp256k1 address (BIP44 HD
+# derivation from one securely-held master mnemonic — see
+# agentic-ads/payments/tim_burner.py) as of the same day: energon is a real,
+# continuously-tested system, not a disposable prototype, so this doesn't get
+# a placeholder while waiting for a "final" version that never actually ships.
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "agentic-ads", "payments"))
 from tim_burner import derive_agent_wallet  # noqa: E402
 
@@ -104,7 +109,7 @@ if __name__ == "__main__":
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:
-        print("Usage: python3 paper_spawner.py <markdown_file> <mode: mcp|slot>")
+        print("Usage: ADAM/.venv/bin/python3 paper_spawner.py <markdown_file> <mode: mcp|slot>")
         sys.exit(1)
     
     spawner = PaperSpawner()
