@@ -1,3 +1,4 @@
+import hashlib
 import os
 import json
 import sys
@@ -8,12 +9,12 @@ from typing import Dict, Any
 # it can pay for things via x402 (ADAM/dwallstreet/x402_handler.py). Larva-born
 # (PAPER_BORN) agents are new in Alexandria v5.0, and this was simply never
 # wired in yet for this birth path — confirmed by grep (2026-07-31), not a
-# regression. derive_wallet() is a deterministic sha256-derived pseudo-address
-# (see agentic-ads/payments/tim_burner.py's own docstring): fine for internal
-# agent-to-agent Energon bookkeeping (ADAM/orbit-node/orbit_hub.py), NEVER to
-# be used as a real on-chain recipient address.
+# regression. derive_agent_wallet() is a deterministic Base58Check pseudo-
+# address (see agentic-ads/payments/tim_burner.py's own docstring): fine for
+# internal agent-to-agent Energon bookkeeping (ADAM/orbit-node/orbit_hub.py),
+# NEVER to be used as a real on-chain recipient address.
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "agentic-ads", "payments"))
-from tim_burner import derive_wallet  # noqa: E402
+from tim_burner import derive_agent_wallet  # noqa: E402
 
 class PaperSpawner:
     def __init__(self):
@@ -74,7 +75,12 @@ if __name__ == "__main__":
         """Registers the agent as a REAL slot in the HIVE/Blower system"""
         registry_path = "/home/ichigo/alexandria/ADAM/agent_registry_phase8.json"
         
-        agent_id = f"paper-slot-{len(data['name'])}"
+        # Was `f"paper-slot-{len(data['name'])}"` — keyed by the NAME'S LENGTH,
+        # so two different agents with same-length names collided on both the
+        # slot id and (once wired) the wallet. Fixed 2026-07-31: keyed by a
+        # hash of the actual name content instead, effectively collision-free.
+        name_hash = hashlib.sha256(data['name'].encode()).hexdigest()[:12]
+        agent_id = f"paper-slot-{name_hash}"
         new_agent = {
             "id": agent_id,
             "name": data['name'],
@@ -82,7 +88,7 @@ if __name__ == "__main__":
             "status": "SLOT_READY",
             "capabilities": data['capabilities'],
             "source": data['source'],
-            "wallet": derive_wallet(agent_id),
+            "wallet": derive_agent_wallet(data['name']),
         }
         
         # Update registry if it exists
