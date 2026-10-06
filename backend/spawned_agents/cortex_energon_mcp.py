@@ -30,7 +30,8 @@ from cortex_injector import CortexInjector
 # ─── Config ───
 CORTEX_URL = "http://localhost:3003"
 DASHBOARD_URL = "http://localhost:5001"
-ADAM_ROOT = Path(__file__).resolve().parent.parent.parent
+# ADAM/ est le frère de ce dépôt (~/alexandria/ADAM) : ce fichier est dans backend/spawned_agents/.
+ADAM_ROOT = Path(__file__).resolve().parents[3] / "ADAM"
 LEDGER_PATH = ADAM_ROOT / "digital-twin-data" / "energon_ledger.json"
 HANDS_STATUS = ADAM_ROOT / "cortex_hands_status.json"
 
@@ -44,6 +45,18 @@ mcp = FastMCP(
 )
 
 injector = CortexInjector()
+
+# Les outils qui AGISSENT (commande shell, écriture d'énergie dans le registre) sont désactivés par défaut :
+# ils ne s'allument que si l'environnement du serveur contient exactement CORTEX_MCP_ECRITURE=1.
+FLAG_ECRITURE = "CORTEX_MCP_ECRITURE"
+
+
+def _ecriture_permise() -> bool:
+    return os.environ.get(FLAG_ECRITURE) == "1"
+
+
+def _desactive(nom: str) -> str:
+    return f"outil {nom} désactivé : ajoute {FLAG_ECRITURE}=1 à l'environnement du serveur pour l'autoriser"
 
 
 def _get(url: str, timeout: int = 3) -> dict:
@@ -101,6 +114,8 @@ def send_energy(kwh: float, worker_id: str = "mcp_claude") -> dict:
         kwh: Quantité en kWh à sceller (≥10 pour activer Phase 3)
         worker_id: Identifiant du worker source
     """
+    if not _ecriture_permise():
+        return {"error": _desactive("send_energy"), "sent": False}
     res = _post(f"{CORTEX_URL}/api/energon/collect", {
         "worker_id": worker_id,
         "egn_generated": kwh,
@@ -199,6 +214,8 @@ def inject_command(cmd: str, timeout: int = 15) -> dict:
         timeout: Timeout en secondes (max 60)
     Returns: stdout, stderr, returncode, elapsed_ms
     """
+    if not _ecriture_permise():
+        return {"cmd": cmd, "stdout": "", "stderr": "", "returncode": -1, "elapsed_ms": 0, "error": _desactive("inject_command")}
     if timeout > 60:
         timeout = 60
     result = injector.inject_command(cmd, timeout=timeout)

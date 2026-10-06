@@ -32,7 +32,7 @@ class CortexInjector:
         self._terminals: Dict[str, dict] = {}
         self._cmd_history: List[dict] = []
         self._boot_time = time.time()
-        self.adam_root = Path(__file__).resolve().parent.parent
+        self.adam_root = Path(__file__).resolve().parents[2] / "ADAM"  # frère de ce dépôt : ~/alexandria/ADAM
 
     # ─── Core Injection ───
 
