@@ -25,6 +25,7 @@ from pathlib import Path
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
 PORT = 3042
+HOST = "127.0.0.1"  # local seulement (règle d'Alexandria) ; il écoutait avant sur toutes les interfaces
 ADAM_ROOT = Path(__file__).resolve().parent.parent.parent
 BACKEND_ROOT = ADAM_ROOT / "backend"
 
@@ -314,7 +315,7 @@ if __name__ == "__main__":
     print(f"   📚 Papers ref: {ADAM_ROOT / 'pdf4forge'}")
     pressure = RATCHET.check_pressure()
     print(f"   🌡️  Thermal state: {pressure['state']} ({pressure['pressure']:.0%})")
-    server = HTTPServer(("0.0.0.0", PORT), CZHandler)
+    server = HTTPServer((HOST, PORT), CZHandler)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
