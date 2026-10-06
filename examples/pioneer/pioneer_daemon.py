@@ -12,8 +12,7 @@ def run_pioneer_service():
             subprocess.run(["python3", "pioneer_master.py"], check=True)
             time.sleep(60)
         except KeyboardInterrupt:
-            print("
-Arrêt du service.")
+            print("\nArrêt du service.")
             break
         except Exception as e:
             print(f"Erreur Daemon : {e}")
