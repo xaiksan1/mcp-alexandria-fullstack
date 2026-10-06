@@ -46,27 +46,41 @@ class PaperSpawner:
         }
 
     def spawn_mcp_server(self, data: Dict[str, Any]):
-        """Generates a Python FastMCP server script"""
+        """Generates a Python FastMCP server script.
+
+        Le titre, les capacités et la source d'un papier sont des DONNÉES : ils entrent dans le script généré
+        comme littéraux (json.dumps) et ne sont JAMAIS interpolés dans du code (ni dans un f-string généré).
+        Le nom du fichier est assaini pour rester dans output_dir.
+        """
         server_name = data['name'].lower().replace(" ", "_")
+        for interdit in ("/", "\\", "\x00"):
+            server_name = server_name.replace(interdit, "_")
+        server_name = server_name.lstrip(".") or "agent"
         script_path = os.path.join(self.output_dir, f"{server_name}_mcp.py")
-        
-        caps = ", ".join(data['capabilities'])
+        if os.path.dirname(os.path.abspath(script_path)) != os.path.abspath(self.output_dir):
+            raise ValueError(f"nom d'agent refusé (sortirait du dossier de sortie) : {data['name']!r}")
+
+        nom = json.dumps(data['name'], ensure_ascii=False)
+        caps = json.dumps(", ".join(data['capabilities']), ensure_ascii=False)
+        source = str(data['source']).replace("\r", " ").replace("\n", " ")
         script_content = f'''
 from fastmcp import FastMCP
 import os
 
-# Server spawned from: {data['source']}
-mcp = FastMCP("{data['name']}")
+# Server spawned from: {source}
+NOM = {nom}
+CAPACITES = {caps}
+mcp = FastMCP(NOM)
 
 @mcp.tool()
 def get_info() -> str:
     """Returns the core purpose of this spawned agent."""
-    return "I am the {data['name']} agent. My capabilities include: {caps}"
+    return "I am the " + NOM + " agent. My capabilities include: " + CAPACITES
 
 @mcp.tool()
 def analyze_context(query: str) -> str:
     """Simulated analysis based on the paper context."""
-    return f"Analyzing '{{query}}' based on {data['name']} principles."
+    return "Analyzing '" + query + "' based on " + NOM + " principles."
 
 if __name__ == "__main__":
     mcp.run()
