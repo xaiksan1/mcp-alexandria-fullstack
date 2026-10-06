@@ -23,7 +23,9 @@ from tim_burner import derive_agent_wallet  # noqa: E402
 
 class PaperSpawner:
     def __init__(self):
-        self.output_dir = "/home/ichigo/alexandria/ADAM/mcp-alexandria-fullstack/backend/spawned_agents"
+        # Relatif à ce fichier : l'ancien chemin codé en dur pointait vers un dossier disparu et
+        # faisait créer un dossier fantôme.
+        self.output_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "spawned_agents")
         os.makedirs(self.output_dir, exist_ok=True)
         print("--- Paper Spawner 1.0 (Straight-Pipe) Initialized ---")
 

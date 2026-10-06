@@ -107,3 +107,22 @@ def test_nom_de_fichier_reste_dans_le_dossier(tmp_path, nom):
     assert chemin.resolve().parent == Path(sp.output_dir).resolve()
     assert chemin.name.endswith("_mcp.py") and "/" not in chemin.name and "\x00" not in chemin.name and not chemin.name.startswith(".")
     assert sorted(p.name for p in tmp_path.iterdir()) == ["spawned_agents"]      # rien d'écrit ailleurs
+
+
+# ── chemins : plus rien de codé en dur vers un dossier disparu ──────────────
+def test_dossier_de_sortie_est_celui_de_ce_depot_pas_un_chemin_perime():
+    backend = Path(__file__).resolve().parents[1]
+    sp = PaperSpawner()
+    assert Path(sp.output_dir) == backend / "spawned_agents"
+    assert Path(sp.output_dir).is_dir()
+    assert not Path("/home/ichigo/alexandria/ADAM/mcp-alexandria-fullstack").exists()      # aucun dossier fantôme créé
+
+
+def test_le_dossier_de_sortie_ne_depend_pas_du_repertoire_courant(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    assert Path(PaperSpawner().output_dir).is_absolute()
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_aucun_chemin_perime_dans_le_code():
+    assert "ADAM/mcp-alexandria-fullstack" not in (Path(__file__).resolve().parents[1] / "paper_spawner.py").read_text()
